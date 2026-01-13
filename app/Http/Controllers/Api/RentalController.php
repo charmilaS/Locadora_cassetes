@@ -7,13 +7,13 @@ use Illuminate\Http\Request;
 use App\Models\Cassette;
 use App\Models\User;
 use App\Models\Rental;
+use Illuminate\Support\Facades\Auth;
 
 class RentalController extends Controller
 {
     public function store(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|exists:users,id',
             'cassette_id' => 'required|exists:cassettes,id',
         ]);
 
@@ -26,10 +26,12 @@ class RentalController extends Controller
         }
 
         $rental = Rental::create([
-            'user_id' => $request->user_id,
+            'user_id' => Auth::id(),
             'cassette_id' => $request->cassette_id,
             'rented_at' => now(),
         ]);
+
+        $rental->load('cassette');
 
         return response()->json($rental, 201);
     }
@@ -46,5 +48,11 @@ class RentalController extends Controller
         $rental->save();
 
         return response()->json($rental);
+    }
+
+    public function index()
+    {
+        $rentals = Rental::with('cassette', 'user')->get();
+        return $rentals;
     }
 }
