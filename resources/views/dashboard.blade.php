@@ -83,12 +83,17 @@
             transform: scale(0.98);
         }
 
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         button.primary {
             background: #1a1a1a;
             color: white;
         }
 
-        button.primary:hover {
+        button.primary:hover:not(:disabled) {
             background: #333;
             border-color: #333;
         }
@@ -102,6 +107,23 @@
         button.secondary:hover {
             background: #fafafa;
             border-color: #ccc;
+        }
+
+        select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            background: white;
+            color: #1a1a1a;
+            cursor: pointer;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #1a1a1a;
         }
 
         .stats {
@@ -156,6 +178,7 @@
             justify-content: space-between;
             align-items: center;
             transition: background 0.15s ease;
+            gap: 12px;
         }
 
         .list-item:last-child {
@@ -270,6 +293,16 @@
             .grid {
                 grid-template-columns: 1fr;
             }
+
+            .list-item {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .list-item select,
+            .list-item button {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -315,8 +348,13 @@
     <div class="grid">
         <div class="section">
             <h2 class="section-title">Alugar</h2>
-            <div class="card" id="rentable-cassettes">
-                <div class="loading">Processando...</div>
+            <div class="card">
+                <div class="list-item">
+                    <select id="cassette-select">
+                        <option value="">Selecione um cassete...</option>
+                    </select>
+                    <button class="primary" onclick="rentSelectedCassette()">Alugar</button>
+                </div>
             </div>
         </div>
 
@@ -344,32 +382,30 @@ async function loadData() {
         document.getElementById('available-count').textContent = availableCassettes.length;
 
         const availableList = document.getElementById('available-cassettes');
-        const rentableList = document.getElementById('rentable-cassettes');
+        const cassetteSelect = document.getElementById('cassette-select');
         
         availableList.innerHTML = '';
-        rentableList.innerHTML = '';
+        cassetteSelect.innerHTML = '<option value="">Selecione um cassete...</option>';
 
         if (!availableCassettes.length) {
-            availableList.innerHTML = '<div class="empty">No cassettes available</div>';
-            rentableList.innerHTML = '<div class="empty">Nothing to rent</div>';
+            availableList.innerHTML = '<div class="empty">Nenhum cassete disponível</div>';
+            cassetteSelect.disabled = true;
         } else {
+            cassetteSelect.disabled = false;
+            
             availableCassettes.forEach(c => {
                 const availableItem = document.createElement('div');
                 availableItem.className = 'list-item';
                 availableItem.innerHTML = `
                     <span class="item-title">${c.title}</span>
-                    <span class="badge available">Available</span>
+                    <span class="badge available">Disponível</span>
                 `;
                 availableList.appendChild(availableItem);
 
-                const rentItem = document.createElement('div');
-                rentItem.className = 'list-item';
-                rentItem.innerHTML = `
-                    <span class="item-title">${c.title}</span>
-                    <button class="primary">Rent</button>
-                `;
-                rentItem.querySelector('button').addEventListener('click', () => rentCassette(c.id));
-                rentableList.appendChild(rentItem);
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = c.title;
+                cassetteSelect.appendChild(option);
             });
         }
 
@@ -384,23 +420,34 @@ async function loadData() {
         rentalsList.innerHTML = '';
 
         if (!activeRentals.length) {
-            rentalsList.innerHTML = '<div class="empty">No active rentals</div>';
+            rentalsList.innerHTML = '<div class="empty">Nenhum aluguel ativo</div>';
         } else {
             activeRentals.forEach(r => {
                 const item = document.createElement('div');
                 item.className = 'list-item';
                 item.innerHTML = `
                     <span class="item-title">${r.cassette.title}</span>
-                    <button class="secondary">Return</button>
+                    <button class="secondary" onclick="returnCassette(${r.id})">Devolver</button>
                 `;
-                item.querySelector('button').addEventListener('click', () => returnCassette(r.id));
                 rentalsList.appendChild(item);
             });
         }
     } catch (err) {
         console.error(err);
-        showNotification('Failed to load data', 'error');
+        showNotification('Erro ao carregar dados', 'error');
     }
+}
+
+async function rentSelectedCassette() {
+    const select = document.getElementById('cassette-select');
+    const cassetteId = select.value;
+    
+    if (!cassetteId) {
+        showNotification('Por favor, selecione um cassete', 'error');
+        return;
+    }
+    
+    await rentCassette(cassetteId);
 }
 
 async function rentCassette(cassetteId) {
@@ -417,15 +464,15 @@ async function rentCassette(cassetteId) {
 
         if (!res.ok) {
             const data = await res.json();
-            showNotification(data.message || 'Failed to rent', 'error');
+            showNotification(data.message || 'Erro ao alugar', 'error');
             return;
         }
 
-        showNotification('Rented successfully', 'success');
+        showNotification('Alugado com sucesso', 'success');
         loadData();
     } catch (err) {
         console.error(err);
-        showNotification('Failed to rent', 'error');
+        showNotification('Erro ao alugar', 'error');
     }
 }
 
@@ -441,15 +488,15 @@ async function returnCassette(rentalId) {
 
         if (!res.ok) {
             const data = await res.json();
-            showNotification(data.message || 'Failed to return', 'error');
+            showNotification(data.message || 'Erro ao devolver', 'error');
             return;
         }
 
-        showNotification('Returned successfully', 'success');
+        showNotification('Devolvido com sucesso', 'success');
         loadData();
     } catch (err) {
         console.error(err);
-        showNotification('Failed to return', 'error');
+        showNotification('Erro ao devolver', 'error');
     }
 }
 
